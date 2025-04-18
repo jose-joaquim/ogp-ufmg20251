@@ -1,0 +1,95 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{setspace}
+\usepackage[T1]{fontenc} 
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ left=30mm,
+ top=30mm,
+ right=20mm,
+ bottom=20mm
+ }
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=magenta,
+    filecolor=cyan,      
+    urlcolor=magenta,
+    citecolor=magenta,
+    pdftitle={OGP 2025.1 - Prova 1},
+    pdfpagemode=FullScreen,
+    }
+
+\onehalfspacing
+
+\title{OGP 2025.1 - Prova 2}
+\author{José Joaquim de Andrade Neto}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+	Hiperlinks estão representados na cor \textcolor{magenta}{magenta} e redirecionam para o meu repositório da disciplina no meu GitHub pessoal.
+\end{abstract}
+
+\section{Questão 1}
+
+\subsection{Setup}
+
+\href{https://github.com/jose-joaquim/ogp-ufmg20251/blob/main/2nd-exam/question1.py}{O código fonte do experimento foi escrito em Python, utilizando o pacote python-mip}.
+Para a resolução dos modelos matemáticos, utilizei o otimizador \textbf{Gurobi 11.0} com a configuração padrão.
+Uma vez que a análise exploratória inicial detectou uma complexidade computacional maior utilizando instâncias de~$50$ nós ou mais, selecionei arbitrariamente um subconjunto de $5$~instâncias com a biblioteca \href{https://pola.rs/}{Polars}.
+Tomei o cuidado para que a amostra fosse representativa o suficiente, para que o objetivo da questão, isto é, comparar analiticamente o efeito dos cortes nas formulações do problema, fosse atingido.
+Por fim, os modelos foram otimizados em um computador Macbook Pro M3, sempre com um $hmax = 10$ e $max\_seconds = 300$.
+
+\subsection{Resultados}
+
+A Tabela~\ref{tab:q1} apresenta os resultados extraídos dos experimentos com as formulações MTZ e GG na seguinte configuração: a Coluna~1 indica a quantidade de nós na instância testada; as colunas~2--6 informam, respectivamente, para a formulação GG, o valor da função objetivo, tempo computacional necessário para achar o valor ótimo da função objetivo \textbf{com} e \textbf{sem} \textsl{hot start}, a quantidade de iterações \textsl{hot start} e a quantidade total de cortes adicionados, e o número de nós explorados de B\&B \textbf{com} e \textbf{sem}.
+Por fim, as colunas 7--11 informam os resultados para a formulação GG na mesma ordem do que para a MTZ.
+
+\begin{table}[h]
+	\centering
+	\caption{Resultados para MTZ e GG com \textsl{hot start}.\label{tab:q1}}
+	\begin{tabular}{lrrrrrrrrrrrrrr}
+		\toprule
+		     &         & \multicolumn{6}{c}{GG} & \multicolumn{6}{c}{MTZ}                                                                                                         \\
+		\cmidrule(lr){3-8}  \cmidrule(lr) {9-14}
+		$n$  & $x^{*}$ & $t$                    & $\bar{t}$               & iter & cuts    & $nd$ & $\overline{nd}$ & $t$   & $\bar{t}$ & iter & cuts    & $nd$ & $\overline{nd}$ \\
+		\midrule
+		$21$ & $432$   & $0$                    & $0$                     & $3$  & $768$   & $0$  & $0$             & $0$   & $0$       & $3$  & $530$   & $0$  & $0$             \\
+		$31$ & $404$   & $1$                    & $0$                     & $3$  & $1665$  & $0$  & $0$             & $1$   & $0$       & $4$  & $1457$  & $0$  & $0$             \\
+		$56$ & $528$   & $27$                   & $0$                     & $5$  & $8903$  & $0$  & $0$             & $20$  & $6$       & $4$  & $6781$  & $0$  & $2821$          \\
+		$73$ & $683$   & $61$                   & $2$                     & $4$  & $11866$ & $0$  & $0$             & $99$  & $8$       & $7$  & $16103$ & $0$  & $5492$          \\
+		$84$ & $669$   & $111$                  & $3$                     & $4$  & $17249$ & $0$  & $0$             & $113$ & $30$      & $4$  & $18531$ & $0$  & $10021$         \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+É possível observar na Tabela~\ref{tab:q1} que o resolvedor matemático precisa de mais tempo computacional para computar a solução ótima à medida que a instância testada possui uma maior quantidade nós.
+Observa-se ainda, que tanto para GG quando para MTZ, existe uma diferença expressiva entre os tempos necessários para a computação da solução ótima \textbf{com} e \textbf{sem} o \textsl{hot start}.
+Essa diferença é justificada pela quantidade de cortes aplicados à relaxação linear original, que chegou a~$17249$ e~$18531$ na instância mais difícil, para GG e MTZ.
+Além disso, a Tabela~\ref{tab:q1} também mostra a superioridade do modelo GG em relação ao MTZ.
+
+Há alguns \textit{trade-offs} relevantes na abordagem de adição de cortes. 
+O primeiro, refletido nas colunas de tempo computacional, é de que é preciso levar em consideração o tempo necessário para adicionar todos os nós.
+Como mostram as mesmas, a resolução do modelo matemático levou mais tempo na abordagem \textsl{hot start}, uma vez que a computação dos cortes mostrou-se um processo mais caro do que a resolução do modelo original, mesmo com formulações mais fracas.
+O segundo é a quantidade de memória necessária para a armazenagem de um MILP mais complexo.
+A título de exemplificação, o arquivo \textsl{.lp} na instância $n = 84$ com o \textsl{hot start} tinha cerca de $700$~MB de tamanho em disco.
+
+Um outro ponto interessante que pode-se notar na Tabela~\ref{tab:q1} é referente à quantidade de nós explorados na árvore de B\&B.
+Em particular, na formulação MTZ, nota-se que todas as instâncias foram resolvidas na otimalidade ainda no nó raiz da árvore.
+Porém, para a formulação sem \textsl{hot start}, foi necessário explorar cerca de $10021$~nós na instância mais difícil.
+
+\section{Questão 2}
+
+\end{document}
