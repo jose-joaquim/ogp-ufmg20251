@@ -203,15 +203,15 @@ class flow_model:
             for i, j in self.arcs:
                 model += arc_flow[i, j] <= big_D * arc_activation[i, j]
 
-        model = Model(sense=MINIMIZE, solver_name=CBC)
+        model = Model(sense=MINIMIZE, solver_name=GUROBI)
 
-        edge_activation, edge_flow = variables(model)
-        constraints(model, edge_activation, edge_flow)
+        arc_activation, arc_flow = variables(model)
+        constraints(model, arc_activation, arc_flow)
 
-        self.model, self.edge_activation, self.edge_flow = (
+        self.model, self.arc_activation, self.arc_flow = (
             model,
-            edge_activation,
-            edge_flow,
+            arc_activation,
+            arc_flow,
         )
 
     def run(self, relax, verbose=False, show_status=False, lp_name=None):
@@ -223,22 +223,38 @@ class flow_model:
         if show_status is True:
             print(f"-- Optimal objective {self.model.objective_value}")
 
+        arc_activation_values = {}
+        for key, var in self.arc_activation.items():
+            arc_activation_values[key] = var.x
+
+        return arc_activation_values
+
     def relax_and_cut(self):
+        cut_counter = 0
         while True:
             arc_activation_values = self.run(relax=True)
 
-            dicut_model(self.dt, arc_activation_values)
-            (S, _S) = dicut_model.run()
+            dicut = dicut_model(self.dt, arc_activation_values)
+            (obj_val, S, _S) = dicut.run()
 
-            if len(_S) == 0:
+            assert obj_val >= 0.0
+            if obj_val < 1.0:
                 break
+
+            self.model += xsum([self.edge_activation[i, j] for i in S for j in _S]) >= 1
+            cut_counter += 1
+
+        print(f"Added {cut_counter} cuts")
+        self.run(relax=False, verbose=True)
 
 
 class dicut_model:
     def __init__(self, dt, arc_activation_values):
         self.arcs = dt.arcs
+        self.N = dt.N
         self.node_requirement = dt.node_requirement
         self.arc_activation_values = arc_activation_values
+        self.create_model()
 
     def create_model(self):
         def variables(model):
@@ -247,13 +263,13 @@ class dicut_model:
                     "w({},{})".format(i, j),
                     var_type=CONTINUOUS,
                     lb=0.0,
-                    obj=self.arc_activation_values[i, j],
                 )
                 for (i, j) in self.arcs
             }
 
             z_var = {
-                i: model.add_var("z({})".format(i), var_type=BINARY) for i in self.nodes
+                i: model.add_var("z({})".format(i), var_type=BINARY)
+                for i in range(self.N)
             }
 
             return w_var, z_var
@@ -265,35 +281,47 @@ class dicut_model:
                 model += z_var[j] + (1 - z_var[i]) - 1
 
             model += (
-                xsum(self.node_requirement[i] * z_var[i] for i in self.nodes) >= 0.01
+                xsum(self.node_requirement[i] * z_var[i] for i in range(self.N)) >= 0.01
+            )
+
+        def objective_function(model, w_var):
+            model.objective = minimize(
+                xsum(
+                    _x * w_var[i, j]
+                    for (i, j), _x in self.arc_activation_values.items()
+                )
             )
 
         model = Model(sense=MINIMIZE, solver_name=CBC)
 
         w_var, z_var = variables(model)
         constraints(model, w_var, z_var)
+        objective_function(model, w_var)
 
-        self.model, w_var = model
+        self.model, self.w_var, self.z_var = model, w_var, z_var
 
     def run(self):
-        self.model.run(relax=False)
+        print("optimizing dicut model")
+        self.model.verbose = True
+        self.model.optimize(relax=False)
 
         S, _S = ([], [])
 
         for i, j in self.arcs:
-            if self.w_var[i, j].x == 1:
-                S.append((i, j))
+            if self.z_var[i].x == 1:
+                S.append(i)
             else:
-                _S.append((i, j))
+                _S.append(i)
 
-        return S, _S
+        return self.model.objective_value, S, _S
 
 
 if __name__ == "__main__":
     seed = 10
     dt = CData(sys.argv[1])
-    improved = flow_model_improved(dt)
-    improved.run(relax=False, verbose=True)
+    # improved = flow_model_improved(dt)
+    # improved.run(relax=False, verbose=True)
 
     trivial = flow_model(dt)
-    trivial.run(relax=False, verbose=True)
+    # trivial.run(relax=False, verbose=True)
+    trivial.relax_and_cut()
