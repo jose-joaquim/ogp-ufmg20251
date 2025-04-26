@@ -223,11 +223,77 @@ class flow_model:
         if show_status is True:
             print(f"-- Optimal objective {self.model.objective_value}")
 
+    def relax_and_cut(self):
+        while True:
+            arc_activation_values = self.run(relax=True)
+
+            dicut_model(self.dt, arc_activation_values)
+            (S, _S) = dicut_model.run()
+
+            if len(_S) == 0:
+                break
+
+
+class dicut_model:
+    def __init__(self, dt, arc_activation_values):
+        self.arcs = dt.arcs
+        self.node_requirement = dt.node_requirement
+        self.arc_activation_values = arc_activation_values
+
+    def create_model(self):
+        def variables(model):
+            w_var = {
+                (i, j): model.add_var(
+                    "w({},{})".format(i, j),
+                    var_type=CONTINUOUS,
+                    lb=0.0,
+                    obj=self.arc_activation_values[i, j],
+                )
+                for (i, j) in self.arcs
+            }
+
+            z_var = {
+                i: model.add_var("z({})".format(i), var_type=BINARY) for i in self.nodes
+            }
+
+            return w_var, z_var
+
+        def constraints(model, w_var, z_var):
+            for i, j in self.arcs:
+                model += w_var[i, j] <= z_var[j]
+                model += w_var[i, j] <= (1 - z_var[i])
+                model += z_var[j] + (1 - z_var[i]) - 1
+
+            model += (
+                xsum(self.node_requirement[i] * z_var[i] for i in self.nodes) >= 0.01
+            )
+
+        model = Model(sense=MINIMIZE, solver_name=CBC)
+
+        w_var, z_var = variables(model)
+        constraints(model, w_var, z_var)
+
+        self.model, w_var = model
+
+    def run(self):
+        self.model.run(relax=False)
+
+        S, _S = ([], [])
+
+        for i, j in self.arcs:
+            if self.w_var[i, j].x == 1:
+                S.append((i, j))
+            else:
+                _S.append((i, j))
+
+        return S, _S
+
 
 if __name__ == "__main__":
+    seed = 10
     dt = CData(sys.argv[1])
-    # improved = flow_model_improved(dt)
-    # improved.run(relax=False, verbose=True)
-    #
+    improved = flow_model_improved(dt)
+    improved.run(relax=False, verbose=True)
+
     trivial = flow_model(dt)
     trivial.run(relax=False, verbose=True)
