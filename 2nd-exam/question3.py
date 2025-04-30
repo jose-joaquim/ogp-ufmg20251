@@ -41,6 +41,7 @@ class CData:
                 elif node[1] > 0:
                     self.demand_nodes[node[0]] = node[1]
                 else:
+
                     self.transhipment_nodes.append(node[0])
 
             for arc in inst["arcs"]:
@@ -155,13 +156,40 @@ class flow_model_improved:
     def run(self, relax, verbose=False, show_status=False, lp_name=None):
         self.model.verbose = verbose
         self.model.optimize(relax=relax, max_seconds=600)
-        if lp_name is not None:
-            self.model.write(lp_name)
+        # if lp_name is not None:
+        #     self.model.write(lp_name)
 
-        if show_status is True:
+        if show_status is True or True:
             print(f"-- Optimal objective {self.model.objective_value}")
 
-        return self.model.objective_value
+        # print("\n".join([f"{k}, {x.x}" for k, x in self.arc_activation.items()]))
+        arc_activation_values = {}
+        for key, var in self.arc_activation.items():
+            arc_activation_values[key] = var.x
+
+        return arc_activation_values, self.model.objective_value
+
+    def relax_and_cut(self):
+        cut_counter = 0
+
+        while True:
+            arc_activation_values, _ = self.run(relax=True, verbose=False)
+
+            dicut = dicut_model(self.dt, arc_activation_values, cut_counter)
+            (obj_val, S, _S) = dicut.run()
+
+            if abs(obj_val - 1.0) < 0.001:
+                break
+
+            arcs_cut = [(i, j) for (i, j) in self.arcs if i in _S and j in S]
+            cuts = [self.arc_activation[i, j] for (i, j) in arcs_cut]
+            # print(f"ADDED CUTS {arcs_cut}")
+
+            self.model += xsum(cuts) >= 1, "cut{}".format(cut_counter)
+            cut_counter += 1
+
+        print(f"Added {cut_counter} cuts")
+        self.run(relax=False, verbose=True)
 
 
 class flow_model:
@@ -219,20 +247,18 @@ class flow_model:
         )
 
     def run(self, relax, verbose=False, show_status=False, lp_name=None):
-        self.model.verbose = True
+        self.model.verbose = verbose
         self.model.optimize(relax=relax, max_seconds=600)
-        if lp_name is not None:
-            self.model.write(lp_name)
+        # if lp_name is not None:
+        #     self.model.write(lp_name)
 
         if show_status is True or True:
             print(f"-- Optimal objective {self.model.objective_value}")
 
-        print("\n".join([f"{k}, {x.x}" for k, x in self.arc_activation.items()]))
+        # print("\n".join([f"{k}, {x.x}" for k, x in self.arc_activation.items()]))
         arc_activation_values = {}
         for key, var in self.arc_activation.items():
             arc_activation_values[key] = var.x
-
-        breakpoint()
 
         return arc_activation_values, self.model.objective_value
 
@@ -240,9 +266,7 @@ class flow_model:
         cut_counter = 0
 
         while True:
-            arc_activation_values, _ = self.run(
-                relax=True, lp_name="relaxed{}.lp".format(cut_counter)
-            )
+            arc_activation_values, _ = self.run(relax=True, verbose=False)
 
             dicut = dicut_model(self.dt, arc_activation_values, cut_counter)
             (obj_val, S, _S) = dicut.run()
@@ -250,15 +274,15 @@ class flow_model:
             if abs(obj_val - 1.0) < 0.001:
                 break
 
-            arcs_cut = [(i, j) for i in S for j in _S if (i, j) in self.arcs]
+            arcs_cut = [(i, j) for (i, j) in self.arcs if i in _S and j in S]
             cuts = [self.arc_activation[i, j] for (i, j) in arcs_cut]
-            print(f"ADDED CUTS {arcs_cut}")
+            # print(f"ADDED CUTS {arcs_cut}")
 
             self.model += xsum(cuts) >= 1, "cut{}".format(cut_counter)
             cut_counter += 1
 
         print(f"Added {cut_counter} cuts")
-        self.run(relax=False)
+        self.run(relax=False, verbose=True)
 
 
 class dicut_model:
@@ -316,7 +340,6 @@ class dicut_model:
 
     def run(self):
         print("optimizing dicut model")
-        self.model.write("dicut{}.lp".format(self.added_cut))
         self.model.verbose = False
         self.model.optimize(relax=False)
 
@@ -335,11 +358,12 @@ class dicut_model:
 if __name__ == "__main__":
     print(f"running {sys.argv[1]}")
     dt = CData(sys.argv[1])
-    # improved = flow_model_improved(dt)
+    improved = flow_model_improved(dt)
     # obj_imp = improved.run(relax=False, verbose=False, lp_name="improved.lp")
 
-    trivial = flow_model(dt)
+    # trivial = flow_model(dt)
     # obj_trivial = trivial.run(relax=False, verbose=False, lp_name="trivial.lp")
 
-    # assert abs(obj_imp - obj_trivial) < 0.01
-    trivial.relax_and_cut()
+    stimer = time()
+    improved.relax_and_cut()
+    print(f"runtime: {time() - stimer:10.2f} s")

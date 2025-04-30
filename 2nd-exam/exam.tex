@@ -40,6 +40,7 @@
 
 \begin{abstract}
 	Hiperlinks estão representados na cor \textcolor{magenta}{magenta} e redirecionam para o meu repositório da disciplina no meu GitHub pessoal.
+	Todos os modelos matemáticos foram otimizados utilizando o resolvedor matemático Gurobi v11 em meu computador pessoal, um Macbook Pro M3.
 \end{abstract}
 
 \section{Questão 1}
@@ -47,7 +48,6 @@
 \subsection{Setup}
 
 \href{https://github.com/jose-joaquim/ogp-ufmg20251/blob/main/2nd-exam/question1.py}{O código fonte do experimento foi escrito em Python, utilizando o pacote python-mip}.
-Para a resolução dos modelos matemáticos, utilizei o otimizador \textbf{Gurobi 11.0} com a configuração padrão.
 Uma vez que a análise exploratória inicial detectou uma complexidade computacional maior utilizando instâncias de~$50$ nós ou mais, selecionei arbitrariamente um subconjunto de $5$~instâncias com a biblioteca \href{https://pola.rs/}{Polars}.
 Tomei o cuidado para que a amostra fosse representativa o suficiente, para que o objetivo da questão, isto é, comparar analiticamente o efeito dos cortes nas formulações do problema, fosse atingido.
 Por fim, os modelos foram otimizados em um computador Macbook Pro M3, sempre com um $hmax = 10$ e $max\_seconds = 300$.
@@ -80,7 +80,7 @@ Observa-se ainda, que tanto para GG quando para MTZ, existe uma diferença expre
 Essa diferença é justificada pela quantidade de cortes aplicados à relaxação linear original, que chegou a~$17249$ e~$18531$ na instância mais difícil, para GG e MTZ.
 Além disso, a Tabela~\ref{tab:q1} também mostra a superioridade do modelo GG em relação ao MTZ.
 
-Há alguns \textit{trade-offs} relevantes na abordagem de adição de cortes. 
+Há alguns \textit{trade-offs} relevantes na abordagem de adição de cortes.
 O primeiro, refletido nas colunas de tempo computacional, é de que é preciso levar em consideração o tempo necessário para adicionar todos os nós.
 Como mostram as mesmas, a resolução do modelo matemático levou mais tempo na abordagem \textsl{hot start}, uma vez que a computação dos cortes mostrou-se um processo mais caro do que a resolução do modelo original, mesmo com formulações mais fracas.
 O segundo é a quantidade de memória necessária para a armazenagem de um MILP mais complexo.
@@ -91,5 +91,76 @@ Em particular, na formulação MTZ, nota-se que todas as instâncias foram resol
 Porém, para a formulação sem \textsl{hot start}, foi necessário explorar cerca de $10021$~nós na instância mais difícil.
 
 \section{Questão 2}
+
+Os experimentos realizados para essa questão, e apresentados na Tabela~\ref{tab:q2-table} reforçam a conclusão da questão anterior sobre os \textit{trade-offs} que devem ser considerados entre as duas formulações.
+\href{https://github.com/jose-joaquim/ogp-ufmg20251/blob/main/2nd-exam/question3.py}{O código fonte está disponível através dessa link}.
+Ressalto que o experimento carece de aprimoramento: é possível utilizar medição de tempo mais precisa, uma linguagem de programação de mais baixo nível, entre outros.
+Entretanto, é visível como a formulação~M, apesar de ser mais apertada que a formulação~S, necessita de mais recursos computacionais para armazenagem de uma quantidade maior de variáveis e restrições.
+Entendo que, por exemplo, uma evidência para a afirmação anterior -- apesar de óbvia -- é a quantidade de tempo computacional que o Gurobi necessitou para otimizar a instância mais difícil, sendo $0.94$ e $62.69$ para a formulação~S e~M, respectivamente.
+
+Importante observar que há um padrão detectado no número de nós explorados em todas as instâncias solucionadas pelas duas formulações.
+O autor deste documento esperava que a quantidade de nós explorados na árvore de \textit{branch-and-bound} na formulação~M fosse menor do que na~S, mas o fato observado foi o oposto.
+Na verdade, a quantidade de nós explorados pela formulação~M é significativamente maior do que na formulação~S.
+Dessa forma, concluo que o experimento deveria ser refeito para a validação, ou correção, dos resultados.
+
+\begin{table}[h]
+	\centering
+	\caption{Resultados numéricos para as formulações S e M.\label{tab:q2-table}}
+	\begin{tabular}[h]{rrrrrrrrr}
+		\toprule
+		\multicolumn{3}{c}{}      & \multicolumn{2}{c}{gap}       & \multicolumn{2}{c}{bb}        & \multicolumn{2}{c}{t(s)}                                               \\
+		\cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+		\multicolumn{1}{c}{$|N|$} & \multicolumn{1}{c}{$|K^{+}|$} & \multicolumn{1}{c}{$|K^{-}|$} & S                        & M     & S      & M       & S      & M       \\
+		\midrule
+		$10$                      & $5$                           & $3$                           & $0.0$                    & $0.0$ & $1$    & $1$     & $0.0$  & $0.08$  \\
+		$10$                      & $5$                           & $5$                           & $0.0$                    & $0.0$ & $1$    & $1$     & $0.0$  & $0.04$  \\
+		$20$                      & $10$                          & $3$                           & $0.0$                    & $0.0$ & $260$  & $2691$  & $0.15$ & $0.5$   \\
+		$20$                      & $10$                          & $5$                           & $0.0$                    & $0.0$ & $103$  & $4256$  & $0.21$ & $1.22$  \\
+		$30$                      & $10$                          & $5$                           & $0.0$                    & $0.0$ & $1$    & $3477$  & $0.22$ & $2.02$  \\
+		$30$                      & $15$                          & $5$                           & $0.0$                    & $0.0$ & $1$    & $273$   & $0.18$ & $0.64$  \\
+		$40$                      & $15$                          & $5$                           & $0.0$                    & $0.0$ & $492$  & $16204$ & $0.33$ & $10.82$ \\
+		$40$                      & $15$                          & $10$                          & $0.0$                    & $0.0$ & $1300$ & $16829$ & $0.37$ & $20.89$ \\
+		$50$                      & $15$                          & $5$                           & $0.0$                    & $0.0$ & $140$  & $759$   & $0.36$ & $2.20$  \\
+		$50$                      & $20$                          & $10$                          & $0.0$                    & $0.0$ & $5652$ & $20499$ & $0.94$ & $62.69$ \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+\section{Questão 3}
+\label{sec:questao-3}
+
+Se por um lado os experimentos realizados na questão~2 apresentam observações levemente contraditórias, os fatos observados nos experimentos dessa questão corrente corroboram com as expectativas.
+\href{https://github.com/jose-joaquim/ogp-ufmg20251/blob/main/2nd-exam/question3.py}{Utilizando o código fonte disponível através desse link}, e considerando a Tabela~\ref{tab:q3-table} para os resultados obtidos, podemos observar como a adição dos cortes do tipo \textit{dicut} melhora significativamente a performance computacional das formulações~S e~M, quando comparados com os resultados exibidos na Tabela~\ref{tab:q2-table}.
+Além disso, a Tabela~\ref{tab:q3-table} apresenta os resultados no mesmo formato da Tabela~\ref{tab:q2-table}, porém adicionando duas novas colunas ao fim, informando a quantidade de cortes válidos adicionados à formulação original do problema.
+
+Em especial para a formulação~M, a Tabela~\ref{tab:q3-table} mostra que a mesma tornou-se mais poderosa do que a formulação~S.
+Por exemplo, a quantidade de nós explorados passou a ser similar entre as duas para quase todas as instâncias.
+Além disso, o tempo computacional necessário para a otimização também caiu consistentemente para a formulação~M, sendo negligível no caso da formulação~S, que já tinha um bom tempo de convergência.
+Por fim, observa-se que todos os ganhos observados foram conquistados com a adição de menos cortes em~M do que em~S (considere a instância mais difícil do experimento, por exemplo).
+
+\begin{table}[h]
+	\centering
+	\caption{Resultados numéricos para as formulações S e M.\label{tab:q3-table}}
+	\begin{tabular}[h]{rrrrrrrrrrr}
+		\toprule
+		\multicolumn{3}{c}{}      & \multicolumn{2}{c}{gap}       & \multicolumn{2}{c}{bb}        & \multicolumn{2}{c}{t(s)} & \multicolumn{2}{c}{cuts}                                                    \\
+		\cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9} \cmidrule(lr){10-11}
+		\multicolumn{1}{c}{$|N|$} & \multicolumn{1}{c}{$|K^{+}|$} & \multicolumn{1}{c}{$|K^{-}|$} & S                        & M                        & S     & M     & S      & M       & S     & M     \\
+		\midrule
+		$10$                      & $5$                           & $3$                           & $0.0$                    & $0.0$                    & $1$   & $1$   & $0.17$ & $0.12$  & $14$  & $8$   \\
+		$10$                      & $5$                           & $5$                           & $0.0$                    & $0.0$                    & $1$   & $1$   & $0.18$ & $0.12$  & $15$  & $9$   \\
+		$20$                      & $10$                          & $3$                           & $0.0$                    & $0.0$                    & $95$  & $1$   & $0.81$ & $0.67$  & $60$  & $36$  \\
+		$20$                      & $10$                          & $5$                           & $0.0$                    & $0.0$                    & $84$  & $1$   & $0.67$ & $0.83$  & $47$  & $39$  \\
+		$30$                      & $10$                          & $5$                           & $0.0$                    & $0.0$                    & $1$   & $1$   & $1.57$ & $1.33$  & $124$ & $64$  \\
+		$30$                      & $15$                          & $5$                           & $0.0$                    & $0.0$                    & $1$   & $1$   & $0.97$ & $0.75$  & $79$  & $28$  \\
+		$40$                      & $15$                          & $5$                           & $0.0$                    & $0.0$                    & $1$   & $404$ & $1.91$ & $5.13$  & $140$ & $80$  \\
+		$40$                      & $15$                          & $10$                          & $0.0$                    & $0.0$                    & $1$   & $1$   & $2.30$ & $7.36$  & $160$ & $113$ \\
+		$50$                      & $15$                          & $5$                           & $0.0$                    & $0.0$                    & $1$   & $1$   & $4.68$ & $8.34$  & $271$ & $102$ \\
+		$50$                      & $20$                          & $10$                          & $0.0$                    & $0.0$                    & $321$ & $162$ & $5.23$ & $11.84$ & $240$ & $109$ \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
 
 \end{document}
